@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 enum AppLaunchPhase: String {
     case splash
@@ -9,30 +10,24 @@ enum AppLaunchPhase: String {
 
 enum AppTab: String, CaseIterable, Identifiable {
     case home
+    case protocols
     case lifeScore
-    case lock
-    case maxx
-    case logs
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .home: return "Home"
+        case .protocols: return "Protocols"
         case .lifeScore: return "LifeScore"
-        case .lock: return "LOCK"
-        case .maxx: return "Maxx"
-        case .logs: return "Logs"
         }
     }
 
     var icon: String {
         switch self {
-        case .home: return "house.fill"
+        case .home: return "square.grid.2x2.fill"
+        case .protocols: return "list.bullet.rectangle.portrait.fill"
         case .lifeScore: return "chart.line.uptrend.xyaxis"
-        case .lock: return "message.fill"
-        case .maxx: return "target"
-        case .logs: return "list.bullet.rectangle.portrait"
         }
     }
 }
@@ -109,6 +104,168 @@ enum DomainLabSection: String, CaseIterable, Identifiable {
         case .resources: return "Resources"
         case .reflection: return "Reflection"
         }
+    }
+}
+
+enum ProtocolStatusTone: String, Codable, CaseIterable {
+    case push
+    case maintain
+    case standard
+
+    var label: String {
+        switch self {
+        case .push: return "PUSH"
+        case .maintain: return "MAINTAIN"
+        case .standard: return "STANDARD"
+        }
+    }
+}
+
+struct HomeTaskItem: Identifiable, Codable, Equatable {
+    let id: UUID
+    var title: String
+    var subtitle: String
+    var estimate: String?
+    var order: Int
+    var isCompleted: Bool
+    var completedAt: Date?
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        subtitle: String,
+        estimate: String? = nil,
+        order: Int,
+        isCompleted: Bool = false,
+        completedAt: Date? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.estimate = estimate
+        self.order = order
+        self.isCompleted = isCompleted
+        self.completedAt = completedAt
+    }
+}
+
+struct HomeQueueViewState {
+    let latestCompleted: HomeTaskItem?
+    let activeTasks: [HomeTaskItem]
+}
+
+struct ProtocolPlanItem: Identifiable, Codable, Equatable {
+    let id: UUID
+    var title: String
+    var cadence: String
+
+    init(id: UUID = UUID(), title: String, cadence: String) {
+        self.id = id
+        self.title = title
+        self.cadence = cadence
+    }
+}
+
+struct ProtocolTaskItem: Identifiable, Codable, Equatable {
+    let id: UUID
+    var title: String
+    var subtitle: String
+    var trailingMetric: String?
+    var isCompleted: Bool
+    var completionNote: String?
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        subtitle: String,
+        trailingMetric: String? = nil,
+        isCompleted: Bool = false,
+        completionNote: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.trailingMetric = trailingMetric
+        self.isCompleted = isCompleted
+        self.completionNote = completionNote
+    }
+}
+
+struct ProtocolTrendRow: Identifiable, Codable, Equatable {
+    var id: String { title }
+    var title: String
+    var dots: [Bool]
+}
+
+struct ProtocolCardViewState: Identifiable, Codable, Equatable {
+    var id: String { domain.rawValue }
+    var domain: MaxxDomain
+    var objective: String
+    var score: Int
+    var weeklyDelta: Int
+    var statusTone: ProtocolStatusTone
+    var lockQuote: String
+    var last7Days: [Bool]
+    var streakDays: Int
+}
+
+struct ProtocolDetailViewState: Identifiable, Codable, Equatable {
+    var id: String { domain.rawValue }
+    var domain: MaxxDomain
+    var objective: String
+    var score: Int
+    var weeklyDelta: Int
+    var statusTone: ProtocolStatusTone
+    var streakDays: Int
+    var lockDiagnosis: String
+    var lockAction: String
+    var plan: [ProtocolPlanItem]
+    var adjustmentNote: String
+    var tasks: [ProtocolTaskItem]
+    var last14Days: [ProtocolTrendRow]
+}
+
+struct LifeScoreDomainInsight: Identifiable, Codable, Equatable {
+    var id: String { domain.rawValue }
+    var domain: MaxxDomain
+    var headline: String
+    var patternRows: [ProtocolTrendRow]
+    var helped: [String]
+    var hurt: [String]
+    var causes: [String]
+    var lockAdjustments: [String]
+    var moves: [String]
+}
+
+struct LockGestureRules {
+    static func shouldOpen(
+        translation: CGSize,
+        predictedEndTranslation: CGSize,
+        cooldownActive: Bool
+    ) -> Bool {
+        guard !cooldownActive else { return false }
+        guard translation.width < 0 else { return false }
+
+        let horizontalIntent = abs(translation.width) > abs(translation.height) * 1.15
+        guard horizontalIntent else { return false }
+
+        let crossesDistance = translation.width <= -65
+        let crossesPredictedDistance = predictedEndTranslation.width <= -110
+        return crossesDistance || crossesPredictedDistance
+    }
+
+    static func shouldClose(
+        translation: CGSize,
+        predictedEndTranslation: CGSize
+    ) -> Bool {
+        guard translation.width > 0 else { return false }
+
+        let horizontalIntent = abs(translation.width) > abs(translation.height) * 1.1
+        guard horizontalIntent else { return false }
+
+        let crossesDistance = translation.width >= 55
+        let crossesPredictedDistance = predictedEndTranslation.width >= 95
+        return crossesDistance || crossesPredictedDistance
     }
 }
 
@@ -194,6 +351,88 @@ struct UserProfile: Codable {
     var constraints: [String]
     var communicationStyle: String
     var baseline: [String: Double]
+
+    var role: String?
+    var heightCm: Double?
+    var weightKg: Double?
+    var targetWeightKg: Double?
+    var sleepTime: Date?
+    var wakeTime: Date?
+    var dailyHours: Double?
+    var monthlyBudget: Double?
+    var gymAccess: String?
+    var dietPreferences: [String]?
+    var primaryGoal: String?
+    var secondaryGoals: [String]?
+    var currentPhase: String?
+    var biggestWeakness: String?
+    var ninetyDayGoal: String?
+    var biggestObstacle: String?
+    var motivationAnchor: String?
+    var lockTone: String?
+    var notificationStyle: String?
+    var startingLifeScore: Int?
+    var onboardingCompleted: Bool?
+
+    init(
+        userId: String,
+        name: String,
+        age: Int?,
+        goals: [String],
+        constraints: [String],
+        communicationStyle: String,
+        baseline: [String: Double],
+        role: String? = nil,
+        heightCm: Double? = nil,
+        weightKg: Double? = nil,
+        targetWeightKg: Double? = nil,
+        sleepTime: Date? = nil,
+        wakeTime: Date? = nil,
+        dailyHours: Double? = nil,
+        monthlyBudget: Double? = nil,
+        gymAccess: String? = nil,
+        dietPreferences: [String]? = nil,
+        primaryGoal: String? = nil,
+        secondaryGoals: [String]? = nil,
+        currentPhase: String? = nil,
+        biggestWeakness: String? = nil,
+        ninetyDayGoal: String? = nil,
+        biggestObstacle: String? = nil,
+        motivationAnchor: String? = nil,
+        lockTone: String? = nil,
+        notificationStyle: String? = nil,
+        startingLifeScore: Int? = nil,
+        onboardingCompleted: Bool? = nil
+    ) {
+        self.userId = userId
+        self.name = name
+        self.age = age
+        self.goals = goals
+        self.constraints = constraints
+        self.communicationStyle = communicationStyle
+        self.baseline = baseline
+        self.role = role
+        self.heightCm = heightCm
+        self.weightKg = weightKg
+        self.targetWeightKg = targetWeightKg
+        self.sleepTime = sleepTime
+        self.wakeTime = wakeTime
+        self.dailyHours = dailyHours
+        self.monthlyBudget = monthlyBudget
+        self.gymAccess = gymAccess
+        self.dietPreferences = dietPreferences
+        self.primaryGoal = primaryGoal
+        self.secondaryGoals = secondaryGoals
+        self.currentPhase = currentPhase
+        self.biggestWeakness = biggestWeakness
+        self.ninetyDayGoal = ninetyDayGoal
+        self.biggestObstacle = biggestObstacle
+        self.motivationAnchor = motivationAnchor
+        self.lockTone = lockTone
+        self.notificationStyle = notificationStyle
+        self.startingLifeScore = startingLifeScore
+        self.onboardingCompleted = onboardingCompleted
+    }
 }
 
 struct ChatContext: Codable {

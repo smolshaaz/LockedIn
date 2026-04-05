@@ -1,41 +1,83 @@
-//
-//  LockedInUITests.swift
-//  LockedInUITests
-//
-//  Created by Mohammad Shazan on 12/03/26.
-//
-
 import XCTest
 
 final class LockedInUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
-        app.launch()
+    func testThreeTabNavigationStructure() throws {
+        let app = launchReadyApp()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.tabBars.buttons["Protocols"].exists)
+        XCTAssertTrue(app.tabBars.buttons["LifeScore"].exists)
+        XCTAssertEqual(app.tabBars.buttons.count, 3)
+    }
+
+    @MainActor
+    func testLockLauncherOpensAndClosesOverlay() throws {
+        let app = launchReadyApp()
+
+        app.buttons["home.lockLauncher"].tap()
+
+        XCTAssertTrue(app.navigationBars["LOCK"].waitForExistence(timeout: 2))
+
+        let closeButton = app.buttons["lock.closeButton"]
+        XCTAssertTrue(closeButton.exists)
+        closeButton.tap()
+
+        XCTAssertFalse(closeButton.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testNameTapOpensSettings() throws {
+        let app = launchReadyApp()
+
+        let nameButton = app.buttons["home.nameButton"]
+        XCTAssertTrue(nameButton.waitForExistence(timeout: 2))
+        nameButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Profile & Settings"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testProtocolsCardNavigation() throws {
+        let app = launchReadyApp()
+
+        app.tabBars.buttons["Protocols"].tap()
+
+        let gymCard = app.buttons["protocol.card.gym"]
+        XCTAssertTrue(gymCard.waitForExistence(timeout: 2))
+        gymCard.tap()
+
+        XCTAssertTrue(app.staticTexts["CURRENT PLAN"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testLogsAccessFromHomeEntry() throws {
+        let app = launchReadyApp()
+
+        app.buttons["home.logsEntry"].tap()
+
+        XCTAssertTrue(app.navigationBars["Logs"].waitForExistence(timeout: 2))
     }
 
     @MainActor
     func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let app = XCUIApplication()
+            app.launchArguments.append("--uitesting-ready")
+            app.launch()
         }
+    }
+
+    @MainActor
+    private func launchReadyApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("--uitesting-ready")
+        app.launch()
+        return app
     }
 }

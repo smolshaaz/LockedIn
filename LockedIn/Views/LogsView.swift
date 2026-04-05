@@ -8,6 +8,7 @@ struct LogsView: View {
     @State private var selectedDate = Date()
     @State private var showNewLogSheet = false
     @State private var editingEntry: LogEntry?
+    @State private var revealedEntryID: UUID?
 
     var body: some View {
         List {
@@ -16,18 +17,9 @@ struct LogsView: View {
             ForEach(store.groupedLogs(domain: selectedDomain, date: isDateFilterEnabled ? selectedDate : nil)) { group in
                 Section(weekLabel(for: group.weekStart)) {
                     ForEach(group.entries) { entry in
-                        logRow(entry)
-                            .listRowBackground(LockPalette.card)
-                            .swipeActions(edge: .trailing) {
-                                Button("Delete", role: .destructive) {
-                                    store.deleteLog(entry)
-                                }
-
-                                Button("Edit") {
-                                    editingEntry = entry
-                                }
-                                .tint(.blue)
-                            }
+                        slidingLogRow(entry)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 2))
+                            .listRowBackground(Color.clear)
                     }
                 }
             }
@@ -109,7 +101,61 @@ struct LogsView: View {
         .buttonStyle(.plain)
     }
 
-    private func logRow(_ entry: LogEntry) -> some View {
+    private func slidingLogRow(_ entry: LogEntry) -> some View {
+        let isRevealed = revealedEntryID == entry.id
+        let revealOffset: CGFloat = -146
+
+        return ZStack(alignment: .trailing) {
+            HStack(spacing: 8) {
+                Button {
+                    editingEntry = entry
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) {
+                        revealedEntryID = nil
+                    }
+                } label: {
+                    Text("Edit")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 66, height: 42)
+                        .background(Color.blue.opacity(0.9))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+
+                Button(role: .destructive) {
+                    store.deleteLog(entry)
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) {
+                        revealedEntryID = nil
+                    }
+                } label: {
+                    Text("Delete")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 74, height: 42)
+                        .background(LockPalette.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.trailing, 10)
+            .opacity(isRevealed ? 1 : 0)
+
+            logContent(entry)
+                .offset(x: isRevealed ? revealOffset : 0)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+                if isRevealed {
+                    revealedEntryID = nil
+                } else {
+                    revealedEntryID = entry.id
+                }
+            }
+        }
+    }
+
+    private func logContent(_ entry: LogEntry) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(entry.action)
@@ -142,7 +188,14 @@ struct LogsView: View {
             }
             .foregroundStyle(LockPalette.textMuted)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(LockPalette.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(LockPalette.stroke, lineWidth: 1)
+        )
     }
 
     private func weekLabel(for date: Date) -> String {

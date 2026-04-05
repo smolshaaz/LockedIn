@@ -13,6 +13,7 @@ final class AppSessionViewModel: ObservableObject {
     private var hasBootstrapped = false
     private let welcomeKey = "lockedin.hasSeenWelcome"
     private let localProfileKey = "lockedin.localProfile"
+    private let onboardingCompletedKey = "hasCompletedOnboarding"
     private let defaultUserID = "ios-dev-user"
 
     var isOnboarded: Bool {
@@ -27,6 +28,26 @@ final class AppSessionViewModel: ObservableObject {
         guard !hasBootstrapped else { return }
         hasBootstrapped = true
 
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-ready") {
+            profile = UserProfile(
+                userId: defaultUserID,
+                name: "Aryan",
+                age: nil,
+                goals: ["Lock execution consistency"],
+                constraints: [],
+                communicationStyle: "Direct",
+                baseline: ["mind": 70]
+            )
+            launchPhase = .ready
+            return
+        }
+
+        let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingCompletedKey)
+        guard hasCompletedOnboarding else {
+            launchPhase = .onboarding
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -38,17 +59,11 @@ final class AppSessionViewModel: ObservableObject {
             profile = loadLocalProfile()
         }
 
-        if profile != nil {
-            UserDefaults.standard.set(true, forKey: welcomeKey)
-            launchPhase = .ready
-            return
+        if profile == nil {
+            profile = loadLocalProfile()
         }
 
-        if UserDefaults.standard.bool(forKey: welcomeKey) {
-            launchPhase = .onboarding
-        } else {
-            launchPhase = .welcome
-        }
+        launchPhase = .ready
     }
 
     func markWelcomeSeen() {
@@ -56,31 +71,26 @@ final class AppSessionViewModel: ObservableObject {
         launchPhase = .onboarding
     }
 
+    func completeOnboarding(with profile: UserProfile) {
+        self.profile = profile
+        saveLocalProfile(profile)
+        UserDefaults.standard.set(true, forKey: onboardingCompletedKey)
+        UserDefaults.standard.set(true, forKey: welcomeKey)
+        launchPhase = .ready
+    }
+
     func completeQuickstart(using vm: OnboardingViewModel) async {
         isLoading = true
         defer { isLoading = false }
 
-        let payload = vm.buildProfile(userId: defaultUserID)
-
-        do {
-            let created = try await api.completeOnboarding(profile: payload)
-            profile = created
-        } catch {
-            // Frontend-first fallback for local dev when backend is unavailable.
-            profile = payload
-        }
-
-        if let profile {
-            saveLocalProfile(profile)
-        }
-        UserDefaults.standard.set(true, forKey: welcomeKey)
-        launchPhase = .ready
+        completeOnboarding(with: vm.buildProfile(userId: defaultUserID))
     }
 
     func setProfile(_ profile: UserProfile) {
         self.profile = profile
         saveLocalProfile(profile)
         UserDefaults.standard.set(true, forKey: welcomeKey)
+        UserDefaults.standard.set(true, forKey: onboardingCompletedKey)
         launchPhase = .ready
     }
 
@@ -88,8 +98,9 @@ final class AppSessionViewModel: ObservableObject {
         profile = nil
         errorMessage = nil
         UserDefaults.standard.removeObject(forKey: welcomeKey)
+        UserDefaults.standard.removeObject(forKey: onboardingCompletedKey)
         UserDefaults.standard.removeObject(forKey: localProfileKey)
-        launchPhase = .welcome
+        launchPhase = .onboarding
         hasBootstrapped = true
     }
 
