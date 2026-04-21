@@ -82,9 +82,6 @@ final class ChatViewModel: ObservableObject {
                     )
                 case .done(let message):
                     doneMessage = message
-                    if streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        self.updateAssistantMessage(at: assistantIndex, content: message)
-                    }
                 }
             }
 
@@ -97,8 +94,8 @@ final class ChatViewModel: ObservableObject {
                 }
             }
 
-            if streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let doneMessage {
+            if let doneMessage,
+               !doneMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 updateAssistantMessage(at: assistantIndex, content: doneMessage)
             }
 

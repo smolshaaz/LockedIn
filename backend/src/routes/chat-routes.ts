@@ -154,7 +154,12 @@ chatRoutes.post("/stream", async (c) => {
         }
       }
 
-      const finalMessage = replyMessage.trim() || "No response generated."
+      const finalMessage = services.coach.sanitizeReply({
+        request,
+        profile: context.profile,
+        recalledMemory: context.recalled,
+        message: replyMessage.trim() || "No response generated.",
+      })
       await services.memory.appendChatTurn(userId, request, finalMessage)
       services.threadState.bump(userId, request.threadId)
 

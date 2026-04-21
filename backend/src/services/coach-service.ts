@@ -227,9 +227,9 @@ function heuristicMessage(input: {
   recalledMemory: string[]
 }): string {
   const primaryDomain = primaryDomainForRequest(input.request)
-  const weakSignal = input.recalledMemory[0]
+  const weakSignal = sanitizeWeakSignal(input.recalledMemory[0])
   const weakness = weakSignal
-    ? weakSignal.slice(0, 120)
+    ? weakSignal
     : "No closed loop on your hardest execution task."
 
   return [
@@ -238,6 +238,120 @@ function heuristicMessage(input: {
     "Execute now: Lock one 45-minute block on your highest-priority task and start immediately.",
     "Deadline: Report completion or blocker in 60 minutes.",
   ].join("\n")
+}
+
+function sanitizeWeakSignal(raw?: string): string | undefined {
+  if (!raw) return undefined
+
+  const cleaned = raw.replace(/\s+/g, " ").trim()
+  if (!cleaned) return undefined
+
+  // Avoid replaying transcript fragments into the bottleneck line.
+  if (
+    /\b(user|assistant|lock)\s*:/i.test(cleaned) ||
+    /\b(reality|bottleneck|execute now|deadline)\s*:/i.test(cleaned)
+  ) {
+    return undefined
+  }
+
+  return cleaned.slice(0, 120)
+}
+
+function isGreetingOnly(message: string): boolean {
+  const cleaned = message
+    .toLowerCase()
+    .replace(/[@,!?._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if (!cleaned) return false
+
+  const strippedLock = cleaned.replace(/\block\b/g, "").trim()
+  const tokens = strippedLock.split(" ").filter(Boolean)
+  if (tokens.length === 0 || tokens.length > 4) return false
+
+  const greetingWords = new Set([
+    "hi",
+    "hii",
+    "hiii",
+    "hey",
+    "heyy",
+    "hello",
+    "yo",
+    "sup",
+  ])
+
+  return tokens.every((token) => greetingWords.has(token))
+}
+
+function greetingMessage(): string {
+  return [
+    "Reality: You showed up. Good.",
+    "Bottleneck: No objective defined yet.",
+    "Execute now: Send one concrete target for today in one sentence.",
+    "Deadline: Send it in 60 seconds.",
+  ].join("\n")
+}
+
+function parseLabeledLine(message: string, labels: string[]): string | undefined {
+  for (const label of labels) {
+    const matcher = new RegExp(`${label}\\s*:\\s*([^\\n]+)`, "i")
+    const match = message.match(matcher)
+    if (match?.[1]) {
+      const value = match[1].replace(/\s+/g, " ").trim()
+      if (value) return value
+    }
+  }
+
+  return undefined
+}
+
+function sanitizeBottleneckText(raw: string): string {
+  const compact = raw.replace(/\s+/g, " ").trim()
+  if (!compact) return "No closed loop on your hardest execution task."
+
+  const strippedRoles = compact.replace(/\b(user|assistant|lock)\s*:/gi, "").trim()
+  if (/\b(reality|bottleneck|execute now|deadline)\s*:/i.test(strippedRoles)) {
+    return "No closed loop on your hardest execution task."
+  }
+
+  return strippedRoles.slice(0, 140)
+}
+
+function normalizeCoachMessage(rawMessage: string, fallback: string): string {
+  const raw = rawMessage.replace(/\r/g, "").trim()
+  if (!raw) return fallback
+
+  const reality = parseLabeledLine(raw, ["Reality"])
+  const bottleneck = parseLabeledLine(raw, ["Bottleneck"])
+  const executeNow = parseLabeledLine(raw, ["Execute now", "Execute"])
+  const deadline = parseLabeledLine(raw, ["Deadline"])
+
+  if (reality || bottleneck || executeNow || deadline) {
+    const fallbackReality = parseLabeledLine(fallback, ["Reality"]) ?? "Execution is not optional."
+    const fallbackBottleneck =
+      parseLabeledLine(fallback, ["Bottleneck"]) ?? "No closed loop on your hardest execution task."
+    const fallbackExecute =
+      parseLabeledLine(fallback, ["Execute now", "Execute"]) ??
+      "Lock one 45-minute block on your highest-priority task and start immediately."
+    const fallbackDeadline =
+      parseLabeledLine(fallback, ["Deadline"]) ?? "Report completion or blocker in 60 minutes."
+
+    return [
+      `Reality: ${reality ?? fallbackReality}`,
+      `Bottleneck: ${sanitizeBottleneckText(bottleneck ?? fallbackBottleneck)}`,
+      `Execute now: ${executeNow ?? fallbackExecute}`,
+      `Deadline: ${deadline ?? fallbackDeadline}`,
+    ].join("\n")
+  }
+
+  const cleanedLines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => line.toLowerCase() !== "execute")
+
+  return cleanedLines.join("\n")
 }
 
 function shouldCreateProtocol(request: ChatRequest): boolean {
@@ -924,6 +1038,36 @@ export class CoachService {
     }
   }
 
+  private finalizeMessage(input: CoachInput, rawMessage: string): string {
+    if (isGreetingOnly(input.request.message)) {
+      return greetingMessage()
+    }
+
+    const fallback = heuristicMessage(input)
+    if (shouldHandleTaskOperation(input.request)) {
+      return rawMessage.trim() || this.taskOperationFallbackNote(input) || fallback
+    }
+
+    return normalizeCoachMessage(rawMessage, fallback)
+  }
+
+  sanitizeReply(input: {
+    request: ChatRequest
+    profile?: Profile
+    recalledMemory: string[]
+    message: string
+  }): string {
+    return this.finalizeMessage(
+      {
+        userId: "n/a",
+        request: input.request,
+        profile: input.profile,
+        recalledMemory: input.recalledMemory,
+      },
+      input.message,
+    )
+  }
+
   private withProtocolFallback(
     basePromise: Promise<ProtocolPlan | undefined>,
     alias: ModelName,
@@ -1020,6 +1164,8 @@ export class CoachService {
         message = heuristicMessage(input)
       }
 
+      message = this.finalizeMessage(input, message)
+
       if (!suggestedProtocol && shouldCreateProtocol(input.request)) {
         suggestedProtocol = await this.generateProtocolWithAlias(modelUsed, input.request)
       }
@@ -1033,7 +1179,10 @@ export class CoachService {
     } catch {
       const taskFallbackMessage = this.taskOperationFallbackNote(input)
       return {
-        message: taskFallbackMessage ?? heuristicMessage(input),
+        message: this.finalizeMessage(
+          input,
+          taskFallbackMessage ?? heuristicMessage(input),
+        ),
         modelUsed: fallbackModel,
         realityCheck,
         suggestedProtocol: shouldCreateProtocol(input.request)
