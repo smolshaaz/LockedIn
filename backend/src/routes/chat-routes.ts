@@ -126,6 +126,25 @@ chatRoutes.post("/stream", async (c) => {
             push("token", { token: replyMessage })
           }
         }
+
+        // Some providers may complete a stream without yielding text tokens.
+        // Recover with a non-stream generation so UI never lands in an empty state.
+        if (!replyMessage.trim()) {
+          try {
+            const recovered = await services.coach.generateReply({
+              userId,
+              request,
+              profile: context.profile,
+              recalledMemory: context.recalled,
+            })
+            replyMessage = recovered.message.trim()
+            if (replyMessage) {
+              push("token", { token: replyMessage })
+            }
+          } catch {
+            // Keep existing fallback below.
+          }
+        }
       } else {
         replyMessage = coachStream.message
         const words = replyMessage.split(/\s+/).filter(Boolean)

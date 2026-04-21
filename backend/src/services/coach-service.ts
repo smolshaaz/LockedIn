@@ -267,8 +267,12 @@ function shouldHandleTaskOperation(request: ChatRequest): boolean {
     message.includes("approve draft") ||
     message.includes("reject draft") ||
     message.includes("archive task") ||
+    message.includes("archive") ||
     message.includes("pause protocol") ||
     message.includes("pause maxx") ||
+    message.includes("pause") ||
+    message.includes("hold this") ||
+    message.includes("stop this") ||
     message.includes("change goal") ||
     message.includes("change objective")
   )

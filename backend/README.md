@@ -55,6 +55,16 @@
   - `anthropic`
   - `openai`
   - `google` (Gemini via `GOOGLE_GENERATIVE_AI_API_KEY`)
+  - `openrouter` (OpenAI-compatible transport)
+- OpenRouter support:
+  - configure OpenAI-compatible base URL + key:
+    - `OPENAI_API_KEY=<openrouter key>`
+    - `OPENAI_BASE_URL=https://openrouter.ai/api/v1`
+    - optional: `OPENAI_REFERER`, `OPENAI_TITLE`
+  - model aliases can use `openrouter/<model-id>` (recommended) or `openai/<model-id>`.
+  - example:
+    - `LOCK_CHAT_MODEL=openrouter/hunter-alpha`
+    - `LOCK_FAST_MODEL=openrouter/healer-alpha`
 - `CoachService` now uses AI SDK:
   - `generateText` for normal chat replies,
   - `streamText` for `/chat/stream`,

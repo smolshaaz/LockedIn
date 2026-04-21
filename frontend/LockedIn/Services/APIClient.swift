@@ -4,7 +4,7 @@ enum APIError: Error, LocalizedError {
     case invalidURL
     case requestFailed
     case serverError(String)
-    case decodeFailed
+    case decodeFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -14,19 +14,29 @@ enum APIError: Error, LocalizedError {
             return "Request failed."
         case .serverError(let message):
             return message
-        case .decodeFailed:
-            return "Failed to decode response."
+        case .decodeFailed(let details):
+            return details.isEmpty ? "Failed to decode response." : details
         }
     }
 }
 
 final class APIClient {
+    private static let productionFallbackBaseURL = "https://lockedin-co8j.onrender.com"
+    private static let placeholderBaseURLs: Set<String> = [
+        "https://api.lockedin.app",
+        "http://api.lockedin.app",
+        "api.lockedin.app",
+    ]
+
     private let baseURL: URL
     private let userID: String
 
     init(baseURL: String? = nil, userID: String? = nil) {
         self.baseURL = APIClient.resolveBaseURL(from: baseURL)
         self.userID = APIClient.resolveUserID(from: userID)
+#if DEBUG
+        print("[APIClient] baseURL=\(self.baseURL.absoluteString)")
+#endif
     }
 
     func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
@@ -81,7 +91,9 @@ final class APIClient {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
-            throw APIError.decodeFailed
+            let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            let snippet = String(raw.prefix(320))
+            throw APIError.decodeFailed("Failed to decode response. Payload: \(snippet)")
         }
     }
 
@@ -104,7 +116,7 @@ final class APIClient {
             UserDefaults.standard.string(forKey: "LOCK_API_BASE_URL"),
             ProcessInfo.processInfo.environment["LOCK_API_BASE_URL"],
             Bundle.main.object(forInfoDictionaryKey: "LOCK_API_BASE_URL") as? String,
-            "https://api.lockedin.app",
+            productionFallbackBaseURL,
         ]
 
         for source in sources {
@@ -112,10 +124,13 @@ final class APIClient {
                   let url = URL(string: normalized) else {
                 continue
             }
+            if placeholderBaseURLs.contains(normalized.lowercased()) {
+                continue
+            }
             return url
         }
 
-        return URL(string: "https://api.lockedin.app")!
+        return URL(string: productionFallbackBaseURL)!
     }
 
     private static func resolveUserID(from explicit: String?) -> String {
@@ -139,6 +154,12 @@ final class APIClient {
         guard var value = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
               !value.isEmpty else {
             return nil
+        }
+
+        // Xcode build settings or manual paste can include wrapping quotes.
+        while (value.hasPrefix("\"") && value.hasSuffix("\""))
+            || (value.hasPrefix("'") && value.hasSuffix("'")) {
+            value = String(value.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         if !value.contains("://") {

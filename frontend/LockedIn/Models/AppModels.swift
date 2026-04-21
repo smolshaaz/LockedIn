@@ -787,6 +787,28 @@ struct BackendTaskMutationResponse: Codable {
     let snapshot: BackendTaskSnapshot
     let idempotent: Bool
     let status: String
+
+    private enum CodingKeys: String, CodingKey {
+        case task
+        case snapshot
+        case idempotent
+        case status
+    }
+
+    init(task: BackendCoachingTask?, snapshot: BackendTaskSnapshot, idempotent: Bool, status: String) {
+        self.task = task
+        self.snapshot = snapshot
+        self.idempotent = idempotent
+        self.status = status
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        task = try container.decodeIfPresent(BackendCoachingTask.self, forKey: .task)
+        idempotent = try container.decodeIfPresent(Bool.self, forKey: .idempotent) ?? false
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? "ok"
+        snapshot = (try? container.decode(BackendTaskSnapshot.self, forKey: .snapshot)) ?? .empty
+    }
 }
 
 struct BackendTaskSnapshot: Codable, Equatable {
@@ -795,6 +817,71 @@ struct BackendTaskSnapshot: Codable, Equatable {
     let allActive: [BackendCoachingTask]
     let drafts: [BackendCoachingTask]
     let unassigned: [BackendCoachingTask]
+
+    static var empty: BackendTaskSnapshot {
+        var mapped: [MaxxDomain: [BackendCoachingTask]] = [:]
+        for domain in MaxxDomain.allCases {
+            mapped[domain] = []
+        }
+        return BackendTaskSnapshot(
+            homeQueue: BackendTaskQueue(latestCompleted: nil, activeTasks: []),
+            byDomain: mapped,
+            allActive: [],
+            drafts: [],
+            unassigned: []
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case homeQueue
+        case byDomain
+        case allActive
+        case drafts
+        case unassigned
+    }
+
+    init(
+        homeQueue: BackendTaskQueue,
+        byDomain: [MaxxDomain: [BackendCoachingTask]],
+        allActive: [BackendCoachingTask],
+        drafts: [BackendCoachingTask],
+        unassigned: [BackendCoachingTask]
+    ) {
+        self.homeQueue = homeQueue
+        self.byDomain = byDomain
+        self.allActive = allActive
+        self.drafts = drafts
+        self.unassigned = unassigned
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        homeQueue = try container.decode(BackendTaskQueue.self, forKey: .homeQueue)
+        allActive = try container.decodeIfPresent([BackendCoachingTask].self, forKey: .allActive) ?? []
+        drafts = try container.decodeIfPresent([BackendCoachingTask].self, forKey: .drafts) ?? []
+        unassigned = try container.decodeIfPresent([BackendCoachingTask].self, forKey: .unassigned) ?? []
+
+        let rawByDomain = try container.decodeIfPresent([String: [BackendCoachingTask]].self, forKey: .byDomain) ?? [:]
+        var mapped: [MaxxDomain: [BackendCoachingTask]] = [:]
+        for domain in MaxxDomain.allCases {
+            mapped[domain] = rawByDomain[domain.rawValue] ?? []
+        }
+        byDomain = mapped
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(homeQueue, forKey: .homeQueue)
+        try container.encode(allActive, forKey: .allActive)
+        try container.encode(drafts, forKey: .drafts)
+        try container.encode(unassigned, forKey: .unassigned)
+
+        var rawByDomain: [String: [BackendCoachingTask]] = [:]
+        for domain in MaxxDomain.allCases {
+            rawByDomain[domain.rawValue] = byDomain[domain] ?? []
+        }
+        try container.encode(rawByDomain, forKey: .byDomain)
+    }
 }
 
 struct BackendTaskSnapshotEnvelope: Codable {

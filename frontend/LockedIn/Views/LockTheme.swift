@@ -4,14 +4,19 @@ import UIKit
 enum LockPalette {
     static let background = Color(red: 0.03, green: 0.04, blue: 0.06)
     static let backgroundElevated = Color(red: 0.06, green: 0.07, blue: 0.1)
-    static let card = Color(red: 0.08, green: 0.09, blue: 0.12)
-    static let cardAlt = Color(red: 0.11, green: 0.12, blue: 0.16)
+    static let card = Color.black.opacity(0.56)
+    static let cardAlt = Color.black.opacity(0.42)
     static let accent = Color(red: 0.93, green: 0.2, blue: 0.28)
     static let accentSoft = Color(red: 0.93, green: 0.2, blue: 0.28).opacity(0.2)
     static let stroke = Color.white.opacity(0.12)
     static let textPrimary = Color.white
     static let textSecondary = Color.white.opacity(0.72)
     static let textMuted = Color.white.opacity(0.52)
+
+    static let glassBase = Color.black.opacity(0.56)
+    static let glassHighlight = Color.white.opacity(0.1)
+    static let glassEdge = Color.white.opacity(0.2)
+    static let glassShadow = Color.black.opacity(0.5)
 }
 
 extension Color {
@@ -82,11 +87,28 @@ struct LockCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(14)
-            .background(LockPalette.card)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(LockPalette.stroke, lineWidth: 1)
+            .lockGlassCard(cornerRadius: 16, tint: LockPalette.card)
+    }
+}
+
+struct LockGlassCardModifier: ViewModifier {
+    var cornerRadius: CGFloat = 16
+    var tint: Color = LockPalette.glassBase
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(tint)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .stroke(LockPalette.glassEdge.opacity(0.95), lineWidth: 1)
+                    )
+                    .shadow(color: LockPalette.glassShadow, radius: 30, x: 0, y: 14)
             )
     }
 }
@@ -129,6 +151,10 @@ extension View {
 
     func lockCard() -> some View {
         modifier(LockCardModifier())
+    }
+
+    func lockGlassCard(cornerRadius: CGFloat = 16, tint: Color = LockPalette.glassBase) -> some View {
+        modifier(LockGlassCardModifier(cornerRadius: cornerRadius, tint: tint))
     }
 
     func enableInteractiveSwipeBack() -> some View {

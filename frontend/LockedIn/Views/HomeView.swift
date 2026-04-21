@@ -131,12 +131,7 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(LockPalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(LockPalette.stroke, lineWidth: 1)
-        )
+        .lockGlassCard(cornerRadius: 16, tint: LockPalette.glassBase)
     }
 
     private var progressBlock: some View {
@@ -154,7 +149,7 @@ struct HomeView: View {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(LockPalette.cardAlt)
+                        .fill(LockPalette.glassBase.opacity(0.7))
                     Capsule()
                         .fill(LockPalette.accent)
                         .frame(width: max(14, proxy.size.width * store.homeProgressFraction))
@@ -283,11 +278,9 @@ struct HomeView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(cardBackground(for: style))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(LockPalette.stroke.opacity(style == .focus ? 0.95 : 0.5), lineWidth: 1)
+            .lockGlassCard(
+                cornerRadius: 16,
+                tint: style == .focus ? LockPalette.glassBase.opacity(0.84) : LockPalette.glassBase.opacity(0.68)
             )
             .opacity(style == .dim ? 0.7 : 1)
         }
@@ -405,17 +398,6 @@ struct HomeView: View {
             return LockPalette.textPrimary
         case .dim:
             return LockPalette.textSecondary
-        }
-    }
-
-    private func cardBackground(for style: HomeTaskRowStyle) -> Color {
-        switch style {
-        case .completed:
-            return LockPalette.cardAlt.opacity(0.4)
-        case .focus:
-            return LockPalette.card
-        case .dim:
-            return LockPalette.cardAlt.opacity(0.75)
         }
     }
 

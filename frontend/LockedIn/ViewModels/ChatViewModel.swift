@@ -89,6 +89,15 @@ final class ChatViewModel: ObservableObject {
             }
 
             if streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               (doneMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
+                let fallback = try await api.sendChat(request: request)
+                let fallbackText = fallback.message.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !fallbackText.isEmpty {
+                    updateAssistantMessage(at: assistantIndex, content: fallbackText)
+                }
+            }
+
+            if streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let doneMessage {
                 updateAssistantMessage(at: assistantIndex, content: doneMessage)
             }
@@ -102,8 +111,9 @@ final class ChatViewModel: ObservableObject {
                messages[assistantIndex].content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 messages.remove(at: assistantIndex)
             }
-            errorMessage = error.localizedDescription
-            messages.append(ChatBubble(role: "assistant", content: "Request failed. Fix the bottleneck and try again."))
+            let friendly = presentableErrorMessage(from: error)
+            errorMessage = friendly
+            messages.append(ChatBubble(role: "assistant", content: "Request failed: \(friendly)"))
         }
     }
 
@@ -201,5 +211,19 @@ final class ChatViewModel: ObservableObject {
         default:
             return nil
         }
+    }
+
+    private func presentableErrorMessage(from error: Error) -> String {
+        let message = error.localizedDescription.lowercased()
+        if message.contains("429") || message.contains("quota") || message.contains("rate limit") {
+            return "Model quota reached. Wait a bit, then retry with one short message."
+        }
+        if message.contains("cannot connect")
+            || message.contains("timed out")
+            || message.contains("network")
+            || message.contains("offline") {
+            return "Cannot reach backend. Check LOCK_API_BASE_URL and server health."
+        }
+        return error.localizedDescription
     }
 }

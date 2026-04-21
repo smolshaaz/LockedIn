@@ -20,12 +20,21 @@ struct ChatView: View {
                             Text(message.content)
                                 .padding(12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(message.role == "assistant" ? LockPalette.card : LockPalette.cardAlt)
+                                .lockGlassCard(
+                                    cornerRadius: 12,
+                                    tint: message.role == "assistant"
+                                        ? LockPalette.glassBase.opacity(0.86)
+                                        : LockPalette.glassBase.opacity(0.65)
+                                )
                                 .foregroundStyle(LockPalette.textPrimary)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(message.role == "assistant" ? LockPalette.accent.opacity(0.7) : LockPalette.stroke, lineWidth: 1)
+                                        .stroke(
+                                            message.role == "assistant"
+                                                ? LockPalette.accent.opacity(0.42)
+                                                : LockPalette.stroke.opacity(0.5),
+                                            lineWidth: 0.9
+                                        )
                                 )
                         }
                     }
@@ -65,11 +74,13 @@ struct ChatView: View {
             }
         }
         .padding(10)
-        .background(LockPalette.cardAlt)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .lockGlassCard(cornerRadius: 18, tint: LockPalette.glassBase.opacity(0.76))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(isComposerFocused ? LockPalette.accent.opacity(0.65) : LockPalette.stroke, lineWidth: 1)
+                .stroke(
+                    isComposerFocused ? LockPalette.accent.opacity(0.6) : LockPalette.stroke.opacity(0.6),
+                    lineWidth: 1
+                )
         )
         .overlay(alignment: .topLeading) {
             if mentionQuery != nil {
@@ -166,11 +177,10 @@ struct ChatView: View {
                 }
             }
         }
-        .background(LockPalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .lockGlassCard(cornerRadius: 14, tint: LockPalette.glassBase.opacity(0.9))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(LockPalette.stroke, lineWidth: 1)
+                .stroke(LockPalette.stroke.opacity(0.68), lineWidth: 1)
         )
     }
 

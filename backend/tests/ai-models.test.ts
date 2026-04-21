@@ -25,6 +25,15 @@ describe("ai-models integration", () => {
     }
   })
 
+  it("parses openrouter provider/model references", () => {
+    const parsed = parseModelRef("openrouter/hunter-alpha")
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(parsed.provider).toBe("openrouter")
+      expect(parsed.modelId).toBe("hunter-alpha")
+    }
+  })
+
   it("rejects invalid model references", () => {
     const parsed = parseModelRef("invalid-ref")
     expect(parsed.ok).toBe(false)
@@ -58,6 +67,7 @@ describe("ai-models integration", () => {
     const availability = getAIAvailability()
     expect(typeof availability.providers.anthropicConfigured).toBe("boolean")
     expect(typeof availability.providers.openAIConfigured).toBe("boolean")
+    expect(typeof availability.providers.openRouterConfigured).toBe("boolean")
     expect(typeof availability.providers.googleConfigured).toBe("boolean")
     expect(typeof availability.chat.ok).toBe("boolean")
     expect(typeof availability.fast.ok).toBe("boolean")

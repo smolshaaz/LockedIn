@@ -11,7 +11,7 @@ import {
 } from "../config/env"
 import type { ModelName } from "../services/model-router-service"
 
-export type SupportedProvider = "anthropic" | "openai" | "google"
+export type SupportedProvider = "anthropic" | "openai" | "google" | "openrouter"
 
 export type ResolveReason =
   | "missing_key"
@@ -64,7 +64,24 @@ const anthropicClient = hasAnthropicKey
   ? createAnthropic({ apiKey: env.ANTHROPIC_API_KEY as string })
   : null
 const openaiClient = hasOpenAIKey
-  ? createOpenAI({ apiKey: env.OPENAI_API_KEY as string })
+  ? createOpenAI({
+      apiKey: env.OPENAI_API_KEY as string,
+      baseURL: env.OPENAI_BASE_URL,
+      headers: {
+        ...(env.OPENAI_REFERER ? { "HTTP-Referer": env.OPENAI_REFERER } : {}),
+        ...(env.OPENAI_TITLE ? { "X-Title": env.OPENAI_TITLE } : {}),
+      },
+    })
+  : null
+const openRouterClient = hasOpenAIKey
+  ? createOpenAI({
+      apiKey: env.OPENAI_API_KEY as string,
+      baseURL: env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
+      headers: {
+        ...(env.OPENAI_REFERER ? { "HTTP-Referer": env.OPENAI_REFERER } : {}),
+        ...(env.OPENAI_TITLE ? { "X-Title": env.OPENAI_TITLE } : {}),
+      },
+    })
   : null
 const googleClient = hasGoogleKey
   ? createGoogleGenerativeAI({
@@ -101,7 +118,12 @@ export function parseModelRef(raw: string): ParsedModelRef {
     }
   }
 
-  if (provider !== "anthropic" && provider !== "openai" && provider !== "google") {
+  if (
+    provider !== "anthropic" &&
+    provider !== "openai" &&
+    provider !== "google" &&
+    provider !== "openrouter"
+  ) {
     return {
       ok: false,
       reason: "unsupported_provider",
@@ -131,6 +153,9 @@ function languageModelFromProvider(
   if (provider === "google") {
     return (googleClient as NonNullable<typeof googleClient>)(modelId)
   }
+  if (provider === "openrouter") {
+    return (openRouterClient as NonNullable<typeof openRouterClient>)(modelId)
+  }
   return (openaiClient as NonNullable<typeof openaiClient>)(modelId)
 }
 
@@ -156,6 +181,15 @@ export function resolveLanguageModel(alias: ModelName): LanguageModelResolution 
       alias,
       reason: "missing_key",
       detail: "OpenAI model requested but OPENAI_API_KEY is missing",
+    }
+  }
+
+  if (parsed.provider === "openrouter" && !openRouterClient) {
+    return {
+      ok: false,
+      alias,
+      reason: "missing_key",
+      detail: "OpenRouter model requested but OPENAI_API_KEY is missing",
     }
   }
 
@@ -194,8 +228,7 @@ export function resolveEmbeddingModel(): EmbeddingModelResolution {
     return {
       ok: false,
       reason: "unsupported_provider",
-      detail:
-        "Anthropic does not expose embeddings in this integration. Use openai/<embedding-model>",
+      detail: "Anthropic does not expose embeddings in this integration. Use openai/<embedding-model> or openrouter/<embedding-model>",
     }
   }
 
@@ -214,6 +247,31 @@ export function resolveEmbeddingModel(): EmbeddingModelResolution {
         provider: parsed.provider,
         modelId: parsed.modelId,
         model: googleClient.embedding(parsed.modelId),
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: "provider_unavailable",
+        detail: error instanceof Error ? error.message : "Embedding provider unavailable",
+      }
+    }
+  }
+
+  if (parsed.provider === "openrouter") {
+    if (!openRouterClient) {
+      return {
+        ok: false,
+        reason: "missing_key",
+        detail: "Embedding model requires OPENAI_API_KEY for OpenRouter",
+      }
+    }
+
+    try {
+      return {
+        ok: true,
+        provider: parsed.provider,
+        modelId: parsed.modelId,
+        model: openRouterClient.embedding(parsed.modelId),
       }
     } catch (error) {
       return {
@@ -271,6 +329,7 @@ export function getAIAvailability() {
     providers: {
       anthropicConfigured: hasAnthropicKey,
       openAIConfigured: hasOpenAIKey,
+      openRouterConfigured: hasOpenAIKey,
       googleConfigured: hasGoogleKey,
     },
     chat: toAvailability(resolveLanguageModel("sonnet")),
