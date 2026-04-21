@@ -3,7 +3,7 @@ FROM oven/bun:1.3.10-alpine
 WORKDIR /app/backend
 
 COPY backend/package.json backend/bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
 COPY backend/ ./
 
