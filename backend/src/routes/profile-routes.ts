@@ -8,15 +8,21 @@ export const profileRoutes = new Hono()
 
 profileRoutes.use("*", authMiddleware)
 
-profileRoutes.get("/", (c) => {
+profileRoutes.get("/", async (c) => {
   const userId = c.get("userId")
-  const profile = services.memory.getProfile(userId)
+  const profile = await services.memory.getProfile(userId)
 
   if (!profile) {
     return c.json({ profile: null })
   }
 
   return c.json({ profile })
+})
+
+profileRoutes.get("/export", async (c) => {
+  const userId = c.get("userId")
+  const exportData = await services.memory.exportUserData(userId)
+  return c.json({ exportData })
 })
 
 profileRoutes.patch("/", async (c) => {
@@ -28,7 +34,7 @@ profileRoutes.patch("/", async (c) => {
     return badRequest(c, parsed.error.issues[0]?.message ?? "Invalid profile payload")
   }
 
-  const updated = services.memory.mergeProfile(userId, parsed.data)
+  const updated = await services.memory.mergeProfile(userId, parsed.data)
 
   if (!updated) {
     return c.json({ error: "Profile not found. Complete onboarding first." }, 404)
@@ -49,6 +55,17 @@ profileRoutes.post("/onboarding", async (c) => {
     return badRequest(c, parsed.error.issues[0]?.message ?? "Invalid onboarding payload")
   }
 
-  const profile = services.memory.setProfile(userId, parsed.data)
+  const profile = await services.memory.setProfile(userId, parsed.data)
   return c.json({ profile }, 201)
+})
+
+profileRoutes.delete("/", async (c) => {
+  const userId = c.get("userId")
+  try {
+    await services.memory.deleteUserData(userId)
+    return c.json({ success: true })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Failed to delete account data"
+    return c.json({ error: detail }, 500)
+  }
 })

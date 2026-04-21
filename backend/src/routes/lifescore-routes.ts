@@ -7,12 +7,12 @@ export const lifeScoreRoutes = new Hono()
 
 lifeScoreRoutes.use("*", authMiddleware)
 
-lifeScoreRoutes.get("/", (c) => {
+lifeScoreRoutes.get("/", async (c) => {
   const userId = c.get("userId")
 
   const lifeScore = computeLifeScore(
-    services.memory.getDomainScores(userId),
-    services.memory.recentTrend(userId),
+    await services.memory.getDomainScores(userId),
+    await services.memory.recentTrend(userId),
   )
 
   return c.json(lifeScore)

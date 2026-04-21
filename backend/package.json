@@ -1,10 +1,21 @@
 {
   "name": "backend",
   "scripts": {
-    "dev": "bun run --hot src/index.ts",
+    "dev": "bun run --hot src/server.ts",
+    "start": "bun run src/server.ts",
     "test": "bun test"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.68",
+    "@ai-sdk/google": "^3.0.64",
+    "@ai-sdk/openai": "^3.0.52",
+    "@chat-adapter/discord": "^4.24.0",
+    "@chat-adapter/state-redis": "^4.24.0",
+    "@chat-adapter/telegram": "^4.24.0",
+    "@supabase/supabase-js": "^2.102.1",
+    "@upstash/redis": "^1.37.0",
+    "ai": "^6.0.156",
+    "chat": "^4.24.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "hono": "^4.12.7",

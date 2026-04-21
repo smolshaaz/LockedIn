@@ -19,13 +19,19 @@ checkinRoutes.post("/weekly", async (c) => {
     return badRequest(c, parsed.error.issues[0]?.message ?? "Invalid check-in payload")
   }
 
-  const previous = { ...services.memory.getDomainScores(userId) }
-  services.memory.ingestCheckin(userId, parsed.data)
+  const previous = { ...(await services.memory.getDomainScores(userId)) }
+  await services.memory.ingestCheckin(userId, parsed.data)
   const progress = diffCheckin(previous, parsed.data)
 
+  const current = computeLifeScore(
+    await services.memory.getDomainScores(userId),
+    await services.memory.recentTrend(userId),
+  )
+  await services.memory.recordLifeScoreSnapshot(userId, parsed.data.weekStart, current.totalScore)
+
   const lifeScore = computeLifeScore(
-    services.memory.getDomainScores(userId),
-    services.memory.recentTrend(userId),
+    await services.memory.getDomainScores(userId),
+    await services.memory.recentTrend(userId),
   )
 
   return c.json({
