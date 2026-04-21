@@ -107,9 +107,12 @@ Set platform keys + webhook config, then run live tests:
 ## Production Deploy (Container)
 
 1. Build + run locally first:
-   - `docker build -t lockedin-api .`
-   - `docker run --rm -p 3000:3000 --env-file .env lockedin-api`
+   - from repo root: `docker build -f backend/Dockerfile -t lockedin-api .`
+   - `docker run --rm -p 3000:3000 --env-file backend/.env lockedin-api`
 2. Deploy the same container to your host (Render/Railway/Fly/any Docker host).
+   - Render settings with this repo layout:
+     - Dockerfile Path: `backend/Dockerfile`
+     - Root Directory: leave empty (repo root context)
 3. Set required env vars in host dashboard:
    - `GOOGLE_GENERATIVE_AI_API_KEY`
    - `LOCK_CHAT_MODEL=google/gemini-2.5-flash`

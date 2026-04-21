@@ -1,11 +1,11 @@
 FROM oven/bun:1.3.10-alpine
 
-WORKDIR /app
+WORKDIR /app/backend
 
-COPY package.json bun.lock ./
+COPY backend/package.json backend/bun.lock ./
 RUN bun install --frozen-lockfile
 
-COPY . .
+COPY backend/ ./
 
 ENV NODE_ENV=production
 EXPOSE 3000
